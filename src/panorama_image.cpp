@@ -3,12 +3,14 @@
 #include <cstring>
 #include <cmath>
 #include <cassert>
+#include <ostream>
 
 #include "image.h"
 #include "matrix.h"
 
 #include <set>
 #include <thread>
+#include <iostream>
 
 using namespace std;
 
@@ -53,7 +55,7 @@ Image both_images(const Image& a, const Image& b)
 Image draw_matches(const Image& a, const Image& b, const vector<Match>& matches, const vector<Match>& inliers)
   {
   Image both = both_images(a, b);
-  
+  printf("Matches size is %d", (int)matches.size());
   for(int i = 0; i < (int)matches.size(); ++i)
     {
     int bx = matches[i].a->p.x; 
@@ -126,9 +128,12 @@ float l1_distance(const vector<float>& a,const vector<float>& b)
   
   // TODO: return the correct number.
   
-  NOT_IMPLEMENTED();
-  
-  return 0;
+  float dist = 0;
+
+  for (int k= 0; k <(int)a.size(); k++){
+    dist = dist + max(a[k] - b[k], b[k] - a[k]);
+  }
+  return dist;
   }
 
 // HW5 2.2a
@@ -143,10 +148,16 @@ vector<int> match_descriptors_a2b(const vector<Descriptor>& a, const vector<Desc
     int bind = -1; // <- find the best match (-1: no match)
     float best_distance=1e10f;  // <- best distance
     
+    for(int i = 0; i< (int)b.size();i++){
+      float curr_distance = l1_distance(a[j].data, b[i].data);
+      if(curr_distance < best_distance){
+        bind = i;
+        best_distance = curr_distance;
+      }
+    }
+    ind.push_back(bind);
     // TODO: find the best 'bind' descriptor in b that best matches a[j]
     // TODO: put your code here:
-    
-    NOT_IMPLEMENTED();
     }
   return ind;
   
@@ -162,13 +173,19 @@ vector<Match> match_descriptors(const vector<Descriptor>& a, const vector<Descri
   {
   if(a.size()==0 || b.size()==0)return {};
   
+  vector<int> inda2b = match_descriptors_a2b(a,b);
+  vector<int> indb2a = match_descriptors_a2b(b,a);
   vector<Match> m;
   
+  for(int i = 0; i < (int) a.size(); i++){
+    int bind = inda2b[i];
+    if( i == indb2a[bind] && bind != -1){
+      Match curr_match = Match(&a[i], &b[bind]);
+      m.push_back(curr_match);
+    }
+  }
   // TODO: use match_descriptors_a2b(a,b) and match_descriptors_a2b(b,a)
   // and populate `m` with good matches!
-  
-  NOT_IMPLEMENTED();
-  
   return m;
   }
 

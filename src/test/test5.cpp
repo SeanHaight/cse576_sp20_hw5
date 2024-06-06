@@ -11,6 +11,7 @@ void test_structure()
   {
   Image im = load_image("data/dogbw.png");
   Image s = structure_matrix(im, 2);
+  
   s.feature_normalize_total();
   save_png(s, "output/structure");
   Image gt = load_image("data/structure.png");
@@ -40,7 +41,10 @@ void run_tests()
 
 int main(int argc, char **argv)
   {
-  
+    Image sean_im = load_image("data/dragon_fly_tail.jpg");
+    Image sean_corners=detect_and_draw_corners(sean_im, 2, 0.2, 5, 3, 0);
+    save_image(sean_corners, "output/sean_corners");
+
   //test_matrix();
   
   run_tests();
