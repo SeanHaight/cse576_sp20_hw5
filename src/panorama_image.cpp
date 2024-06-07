@@ -55,7 +55,6 @@ Image both_images(const Image& a, const Image& b)
 Image draw_matches(const Image& a, const Image& b, const vector<Match>& matches, const vector<Match>& inliers)
   {
   Image both = both_images(a, b);
-  printf("Matches size is %d", (int)matches.size());
   for(int i = 0; i < (int)matches.size(); ++i)
     {
     int bx = matches[i].a->p.x; 
@@ -200,11 +199,16 @@ Point project_point(const Matrix& H, const Point& p)
   // TODO: project point p with homography H.
   // Remember that homogeneous coordinates are equivalent up to scalar.
   // Have to divide by.... something...
+  double x = p.x;
+  double y = p.y;
+  double x_hom = H(0,0)*x + H(0,1)*y + H(0,2);
+  double y_hom = H(1,0)*x + H(1,1)*y + H(1,2);
+  double z_hom = H(2,0)*x + H(2,1)*y + H(2,2);
   
-  NOT_IMPLEMENTED();
-  
-  
-  return Point(0,0);
+  if (z_hom == 0.0){
+    return Point(0,0);
+  }
+  return Point(x_hom/z_hom,y_hom/z_hom);
   }
 
 // HW5 3.2a
@@ -214,8 +218,7 @@ Point project_point(const Matrix& H, const Point& p)
 double point_distance(const Point& p, const Point& q)
   {
   // TODO: should be a quick one.
-  NOT_IMPLEMENTED();
-  return 0;
+  return pow(pow(p.x - q.x, 2) + pow(p.y - q.y, 2), .5);
   }
 
 // HW5 3.2b
@@ -230,9 +233,14 @@ vector<Match> model_inliers(const Matrix& H, const vector<Match>& m, float thres
   vector<Match> inliers;
   // TODO: fill inliers
   // i.e. distance(H*a.p, b.p) < thresh
-  
-  NOT_IMPLEMENTED();
-  
+  for(int i = 0; i < (int)m.size(); i++){
+    Match curr_match = m[i];
+    Descriptor a = *curr_match.a;
+    Descriptor b = *curr_match.b;
+    if (point_distance(project_point(H, a.p), b.p) < thresh){
+      inliers.push_back(curr_match);
+    }
+  }
   return inliers;
   }
 
@@ -244,8 +252,10 @@ void randomize_matches(vector<Match>& m)
   // TODO: implement Fisher-Yates to shuffle the array.
   // You might want to use the swap function like:
   // swap(m[0],m[1]) which swaps the first and second element
-  
-  NOT_IMPLEMENTED();
+    for(int i = (int)m.size() - 1; i > 0; i-- ){
+      int j = rand()%(i + 1);
+      swap(m[i], m[j]);
+    }
   }
 
 // HW5 3.4
@@ -268,20 +278,42 @@ Matrix compute_homography_ba(const vector<Match>& matches)
     
     double nx = matches[i].b->p.x;
     double ny = matches[i].b->p.y;
+
     // TODO: fill in the matrices M and b.
-    
-    NOT_IMPLEMENTED();
-    
+    M(2*i, 0) = mx;
+    M(2*i,1) = my;
+    M(2*i,2) = 1;
+    M(2*i, 3) = 0; 
+    M(2*i,4) = 0;
+    M(2*i,5) = 0;
+    M(2*i,6) = -mx*nx;
+    M(2*i,7) = -my*nx;
+
+    M(2*i+1, 0) = 0;
+    M(2*i+1,1) = 0;
+    M(2*i+1,2) = 0;
+    M(2*i+1, 3) = mx; 
+    M(2*i+1,4) = my;
+    M(2*i+1,5) = 1;
+    M(2*i+1,6) = -ny*mx;
+    M(2*i+1,7) = -ny*my;
+
+    b(2*i) = nx - mx;
+    b(2*i + 1) = ny - my;
     }
-  
-  
   
   Matrix a = solve_system(M, b);
   
   Matrix Hba(3, 3);
-  // TODO: fill in the homography H based on the result in a.
-  
-  NOT_IMPLEMENTED();
+  Hba(0,0) = 1 + a(0);
+  Hba(0,1) = a(1);
+  Hba(0,2) = a(2);
+  Hba(1,0) = a(3);
+  Hba(1,1) = 1 + a(4);
+  Hba(1,2) = a(5);
+  Hba(2,0) = a(6);
+  Hba(2,1) = a(7);
+  Hba(2,2) = 1;
   
   return Hba;
   }
@@ -304,6 +336,21 @@ Matrix RANSAC(vector<Match> m, float thresh, int k, int cutoff)
   int best = 0;
   Matrix Hba = Matrix::translation_homography(256, 0);
   // TODO: fill in RANSAC algorithm.
+  int num_matches = 4;
+  for(int i = 0; i < k; i++){
+  
+    randomize_matches(m);
+    vector<Match> sub_vector(m.begin() + 0, m.begin() + num_matches);
+    Matrix new_Hba = compute_homography_ba(sub_vector);
+    vector<Match> new_inliers = model_inliers(new_Hba, m, thresh);
+    if((int) new_inliers.size() > best){
+      Hba = compute_homography_ba(new_inliers);
+      best = (int) new_inliers.size();
+      if (best > cutoff){
+        return Hba;
+      }
+    }
+  }
   // for k iterations:
   //     shuffle the matches
   //     compute a homography with a few matches (how many??)
@@ -313,8 +360,6 @@ Matrix RANSAC(vector<Match> m, float thresh, int k, int cutoff)
   //         if it's better than the cutoff:
   //             return it immediately
   // if we get to the end return the best homography
-  
-  NOT_IMPLEMENTED();
   
   return Hba;
   }
@@ -392,9 +437,20 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
     for(int j = 0; j < a.h; ++j)
       for(int i = 0; i < a.w; ++i)
         {
+          c(i - dx,j - dy,k) = a(i,j,k);
         // TODO: fill in.
-        NOT_IMPLEMENTED();
         }
+  for(int k = 0; k < b.c; ++k)
+    for(int j = (int)topleft.y; j < (int) botright.y; j++)
+      for(int i = (int) topleft.x; i < (int) botright.x; i++){
+       Point curr_point_in_b = project_point(Hba, Point(i,j));
+       bool in_x_bound = (0 <= curr_point_in_b.x && curr_point_in_b.x < b.w);
+       bool in_y_bound = (0<= curr_point_in_b.y && curr_point_in_b.y < b.h);
+        if ( in_x_bound && in_y_bound){
+
+          c(i- dx,j - dy, k) = b((int) curr_point_in_b.x, (int) curr_point_in_b.y, k);
+        }
+      }
   
   // TODO: Blend in image b as well.
   // You should loop over some points in the new image (which? all?)
@@ -409,9 +465,6 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
   // The member 
   
   // TODO: Put your code here.
-  
-  NOT_IMPLEMENTED();
-  
   
   // We trim the image so there are as few as possible black pixels.
   return trim_image(c);
