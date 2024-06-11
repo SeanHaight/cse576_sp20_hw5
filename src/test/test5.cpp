@@ -41,17 +41,12 @@ void run_tests()
 
 int main(int argc, char **argv)
   {
-    Image dragon_tail = load_image("data/cratera.jpg");
-    Image dragon_mid = load_image("data/craterb.jpg");
+    Image sean_left = load_image("data/cratera.jpg");
+    Image sean_right = load_image("data/craterb.jpg");
 
-    Image dragon_pan=panorama_image(dragon_tail,dragon_mid,2,0,0.3,7,3,5,10000,50,0.5);
-    Image dragon_matches = find_and_draw_matches(dragon_tail, dragon_mid, 2, 0.4, 7, 3, 0);
-    vector<Descriptor> dragon_taild=harris_corner_detector(dragon_tail, 2, 0.3, 7, 3, 0);
-    vector<Descriptor> dragon_midd=harris_corner_detector(dragon_mid, 2, 0.3, 7, 3, 0);
-    vector<Match> dragon_match=match_descriptors(dragon_taild,dragon_midd);
-    Image dragon_inliers=draw_inliers(dragon_tail,dragon_mid,RANSAC(dragon_match,5,10000,50),dragon_match,6);
-    save_image(dragon_inliers, "output/dragon_fly_inliers");
-    save_image(dragon_pan, "output/dragon_pan");
+    Image sean_pan=panorama_image(sean_left, sean_right,2,0,0.3,7,3,5,10000,50,0.5);
+
+    save_image(sean_pan, "output/sean_pan");
   //test_matrix();
   
   run_tests();

@@ -447,8 +447,13 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
        bool in_x_bound = (0 <= curr_point_in_b.x && curr_point_in_b.x < b.w);
        bool in_y_bound = (0<= curr_point_in_b.y && curr_point_in_b.y < b.h);
         if ( in_x_bound && in_y_bound){
-
-          c(i- dx,j - dy, k) = b((int) curr_point_in_b.x, (int) curr_point_in_b.y, k);
+          double b_val = b.pixel_bilinear(curr_point_in_b.x, curr_point_in_b.y, k);
+          double sean_blendcoeff = min(1.0, i/(2.0*a.w));
+          if(0 < i && i < a.w && 0 < j && j < a.h){
+            c(i- dx,j - dy, k) = a(i,j,k)*(1 - sean_blendcoeff) + (sean_blendcoeff)*b_val;
+          } else {
+            c(i- dx,j - dy, k) = b_val;
+          }
         }
       }
   
@@ -507,15 +512,36 @@ Image panorama_image(const Image& a, const Image& b, float sigma, int corner_met
 // returns: image projected onto cylinder, then flattened.
 Image cylindrical_project(const Image& im, float f)
   {
-  //TODO: project image onto a cylinder
-  double hfov=atan(im.w/(2*f));
-  double vfov=im.h/2./f;
-  
+  // TODO: project image onto a cylinder
+  double hfov = atan(im.w / (2 * f));
+  double vfov = im.h / 2. / f;
+
   // For your convenience we have computed the output size
-  Image c(im.w/cos(hfov),im.h/cos(hfov),im.c);
-  
-  NOT_IMPLEMENTED();
-  
+  Image c(im.w / cos(hfov), im.h / cos(hfov), im.c);
+  float center_x = im.w / 2.;
+  float center_y = im.h / 2.;
+  // The idea is to reproeject a point in the cylindrical image back into the
+  // orignal image to figure out what the pixel intensity value should be.
+  for (int i = 0; i < c.w; i++) {
+    for (int j = 0; j < c.h; j++) {
+      float theta = (i - center_x) / f;
+      float h = (j - center_y) / f;
+
+      float x_hat = sin(theta);
+      float y_hat = h;
+      float z_hat = cos(theta);
+
+      float x = (f * x_hat / z_hat) + center_x;
+      float y = (f * y_hat / z_hat) + center_y;
+
+      if (im.contains(x, y)) {
+        for (int k = 0; k < im.c; k++) {
+          c(i, j, k) = im.pixel_bilinear(x, y, k);
+        }
+      }
+    }
+  }
+
   return c;
   }
 
